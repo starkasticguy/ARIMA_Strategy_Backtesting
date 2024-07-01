@@ -1,29 +1,39 @@
+import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
 
-
 class RollingPredictor:
-    def __init__(self, data, model_order, window_size):
+    def __init__(self, data, best_orders, initial_window_size):
         self.data = data
-        self.model_order = model_order
-        self.window_size = window_size
-        self.predictions = []
+        self.best_orders = best_orders
+        self.initial_window_size = initial_window_size
 
     def rolling_forecast(self):
-        if len(self.data) <= self.window_size:
-            print("Not enough data for the initial window size.")
-            return []
+        predictions = {}
+        for column, order in self.best_orders.items():
+            predictions[column] = self._rolling_forecast_for_column(self.data[column], order)
 
-        for i in range(len(self.data) - self.window_size):
-            train = self.data[i:i + self.window_size]
-            model = ARIMA(train, order=self.model_order)
+        return predictions
+
+    def _rolling_forecast_for_column(self, series, order):
+        rolling_predictions = []
+        for i in range(self.initial_window_size, len(series)):
+            train = series[:i]
+            model = ARIMA(train, order=order)
             model_fit = model.fit()
-            pred = model_fit.forecast(steps=1).iloc[0]  # Use iloc to access the first element
-            self.predictions.append(pred)
+            pred = model_fit.forecast()[0]
+            rolling_predictions.append(pred)
 
-        return self.predictions
+        return rolling_predictions
 
     def future_forecast(self, steps=5):
-        model = ARIMA(self.data, order=self.model_order)
-        model_fit = model.fit()
-        future_predictions = model_fit.forecast(steps=steps)
+        future_predictions = {}
+        for column, order in self.best_orders.items():
+            future_predictions[column] = self._future_forecast_for_column(self.data[column], order, steps)
+
         return future_predictions
+
+    def _future_forecast_for_column(self, series, order, steps):
+        model = ARIMA(series, order=order)
+        model_fit = model.fit()
+        forecast = model_fit.forecast(steps=steps)
+        return forecast

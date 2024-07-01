@@ -5,5 +5,5 @@ class StockDataFetcher:
         self.ticker = ticker
 
     def fetch_data(self, start_date, end_date):
-        stock_data = yf.download(self.ticker, start=start_date, end=end_date)
-        return stock_data['Close']
+        stock = yf.download(self.ticker, start=start_date, end=end_date)
+        return stock[['Open', 'High', 'Low', 'Close']]

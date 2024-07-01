@@ -1,6 +1,7 @@
 import pandas as pd  # Import pandas
+from pandas.tseries.offsets import CustomBusinessDay
 from scripts.data_fetcher import StockDataFetcher
-from scripts.data_preprocessor import DataPreprocessor
+from scripts.data_preprocessor import DataPreprocessor, IndianBusinessCalendar
 from scripts.time_series_analyzer import TimeSeriesAnalyzer
 from scripts.model_selector import OrderSelector
 from scripts.rolling_predictor import RollingPredictor
@@ -8,7 +9,10 @@ from scripts.trading_strategy import TradingStrategy
 from scripts.report_generator import ReportGenerator
 import matplotlib.pyplot as plt
 
-def main(ticker, start_date, end_date, initial_window_size=300):  # Reduced window size
+# Define a custom business day
+indian_bday = CustomBusinessDay(calendar=IndianBusinessCalendar())
+
+def main(ticker, start_date, end_date, initial_window_size=100):  # Reduced window size
     # Fetch data
     fetcher = StockDataFetcher(ticker)
     data = fetcher.fetch_data(start_date, end_date)
@@ -27,17 +31,19 @@ def main(ticker, start_date, end_date, initial_window_size=300):  # Reduced wind
 
     # Select model order
     order_selector = OrderSelector(processed_data)
-    best_order, best_model = order_selector.select_order()
+    best_orders, best_models = order_selector.select_order()
 
-    print(f"Best ARIMA order: {best_order}")
-    best_model.summary()
+    print(f"Best ARIMA orders: {best_orders}")
+    for key, model in best_models.items():
+        print(f"\n{key} Model Summary:")
+        print(model.summary())
 
     # Rolling prediction
-    predictor = RollingPredictor(processed_data, best_order, initial_window_size)
+    predictor = RollingPredictor(processed_data, best_orders, initial_window_size)
     predictions = predictor.rolling_forecast()
     future_predictions = predictor.future_forecast(steps=5)
 
-    print(f"Number of predictions: {len(predictions)}")
+    print(f"Number of predictions: {len(predictions['Close'])}")  # Example for Close prices
     print(predictions)
     print(f"Future predictions: {future_predictions}")
 
@@ -48,10 +54,10 @@ def main(ticker, start_date, end_date, initial_window_size=300):  # Reduced wind
 
     strategy = TradingStrategy(predictions, processed_data[initial_window_size:], future_predictions)
     cumulative_return = strategy.backtest()
-    future_returns = strategy.future_return()
-    last_5_days_prices, last_5_days_returns = strategy.last_5_days()
+    future_dod_change = strategy.future_return()
+    last_5_days_prices, last_5_days_dod_change = strategy.last_5_days()
 
-    print(f"Cumulative return length: {len(cumulative_return)}")
+    print(f"Cumulative return length: {len(cumulative_return['Close'])}")  # Example for Close prices
     print(cumulative_return)
 
     # Generate report
@@ -61,21 +67,21 @@ def main(ticker, start_date, end_date, initial_window_size=300):  # Reduced wind
         strategy.sell_signals,
         strategy.volatility,
         processed_data[initial_window_size:],
-        pd.Series(predictions, index=processed_data[initial_window_size:].index),
+        {k: pd.Series(v, index=processed_data[initial_window_size:].index) for k, v in predictions.items()},
         strategy.future_predictions,
-        future_returns,
+        future_dod_change,
         last_5_days_prices,
-        last_5_days_returns
+        last_5_days_dod_change
     )
     metrics = report.generate_report()
 
     print("Generated Report:")
     for key, value in metrics.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value}")
 
 if __name__ == "__main__":
-    ticker = "RELIANCE.NS"
-    start_date = "2023-05-01"
-    end_date = "2024-06-28"
+    ticker = "KOTAKBANK.NS"
+    start_date = "2024-01-01"
+    end_date = "2024-07-01"
 
     main(ticker, start_date, end_date)

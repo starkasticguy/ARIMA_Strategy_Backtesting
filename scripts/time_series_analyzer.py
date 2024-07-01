@@ -6,45 +6,39 @@ import matplotlib.pyplot as plt
 class TimeSeriesAnalyzer:
     def __init__(self, data):
         self.data = data
-        if not isinstance(data.index, pd.DatetimeIndex):
-            raise ValueError("Data index must be a pandas DatetimeIndex")
-        self.data = self.data.asfreq('D')  # Set frequency to daily
-        self.data = self.data.interpolate()  # Interpolate missing values
-
-    def decompose(self, model='additive'):
-        decomposition = seasonal_decompose(self.data, model=model)
-        self.trend = decomposition.trend
-        self.seasonal = decomposition.seasonal
-        self.residual = decomposition.resid  # Correct attribute name
-        return decomposition
 
     def plot_decomposition(self):
-        decomposition = self.decompose()
-        fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 8))
-        decomposition.observed.plot(ax=ax1, legend=False)
-        ax1.set_ylabel('Observed')
-        decomposition.trend.plot(ax=ax2, legend=False)
-        ax2.set_ylabel('Trend')
-        decomposition.seasonal.plot(ax=ax3, legend=False)
-        ax3.set_ylabel('Seasonal')
-        decomposition.resid.plot(ax=ax4, legend=False)  # Correct attribute name
-        ax4.set_ylabel('Residual')
-        plt.tight_layout()
-        plt.show()
+        period = 5  # Set the period to 5 business days (weekly seasonality for business days)
+        for column in self.data.columns:
+            decomposition = seasonal_decompose(self.data[column], model='additive', period=period)
+            decomposition.plot()
+            plt.title(f'Decomposition of {column} Price')
+            plt.show()
 
     def check_stationarity(self):
-        result = adfuller(self.data.dropna())
-        print(f'ADF Statistic: {result[0]}')
-        print(f'p-value: {result[1]}')
-        return result[1] < 0.05
+        results = {}
+        for column in self.data.columns:
+            result = adfuller(self.data[column].dropna())
+            print(f'ADF Statistic for {column}: {result[0]}')
+            print(f'p-value for {column}: {result[1]}')
+            results[column] = result[1] < 0.05
+        return results
 
     def plot_acf_pacf(self, lags=40):
-        fig, ax = plt.subplots(2, 1, figsize=(12, 8))
-        acf_values = acf(self.data.dropna(), nlags=lags)
-        pacf_values = pacf(self.data.dropna(), nlags=lags)
-        ax[0].stem(acf_values)
-        ax[0].set_title('ACF')
-        ax[1].stem(pacf_values)
-        ax[1].set_title('PACF')
-        plt.tight_layout()
-        plt.show()
+        for column in self.data.columns:
+            fig, ax = plt.subplots(2, 1, figsize=(12, 8))
+            acf_values = acf(self.data[column].dropna(), nlags=lags)
+            pacf_values = pacf(self.data[column].dropna(), nlags=lags)
+
+            ax[0].stem(range(len(acf_values)), acf_values, basefmt=" ")
+            ax[0].set_title(f'Autocorrelation Function (ACF) for {column}')
+            ax[0].set_xlabel('Lags')
+            ax[0].set_ylabel('ACF')
+
+            ax[1].stem(range(len(pacf_values)), pacf_values, basefmt=" ")
+            ax[1].set_title(f'Partial Autocorrelation Function (PACF) for {column}')
+            ax[1].set_xlabel('Lags')
+            ax[1].set_ylabel('PACF')
+
+            plt.tight_layout()
+            plt.show()
