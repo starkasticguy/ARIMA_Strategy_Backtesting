@@ -1,5 +1,6 @@
 class ARIMAStrategy:
     def __init__(self, data, forecaster):
+
         self.data = data
         self.forecaster = forecaster
         self.position = None
